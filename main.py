@@ -84,15 +84,15 @@ class Meeting(BaseModel):
     id: str | str = None
     bookId: str| str = None
     bookTitle: str| str = None
-    scheduledAt: datetime
-    duration: int
+    scheduledAt: str | None = None
+    duration: int | None = None
     location: str| str = None
     locationUrl: str| str = None
     description: str| str = None
-    createdBy: str
-    attendeeCount: int
-    status: str  # Próxima | Vencida | Cancelada
-    isVirtual: bool
+    createdBy: str | None = None
+    attendeeCount: int | None = None
+    status: str | None = None  # Próxima | Vencida | Cancelada
+    isVirtual: bool | None = None
     virtualMeetingUrl: str| str = None
 
 
