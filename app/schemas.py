@@ -56,14 +56,22 @@ class BookOut(BaseModel):
 
 
 class ReviewCreate(BaseModel):
+    club_id: int
     book_id: int
     user_id: int
     rating: int
     comment: str  
 
+class ReviewUpdate(BaseModel):
+    id: int
+    club_id: int
+    book_id: int
+    rating: int
+    comment: str 
 
 class ReviewOut(BaseModel):
     id: int
+    club_id: int
     book_id: int
     user_id: int
     rating: int

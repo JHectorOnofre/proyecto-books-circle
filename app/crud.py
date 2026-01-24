@@ -92,7 +92,6 @@ def create_book(db: Session, book: schemas.BookCreate):
         return None
 
 
-
 def get_book_by_id(db: Session, book_id: int, club_id: int):
     return db.query(models.Book).filter(models.Book.id == book_id, models.Book.club_id == club_id).first()
 
@@ -117,7 +116,59 @@ def delete_votes_by_book_id(db: Session, book_id: int, club_id: int):
     return book.votes
 
 
+# =========REVIEWS ============
+def get_reviews_by_book_id(db: Session, book_id: int, club_id: int):
+    return db.query(models.Review).filter(models.Review.book_id == book_id, models.Review.club_id == club_id).all()
 
+
+def create_review(db: Session, review: schemas.ReviewCreate):
+    try:
+        db_review = models.Review(
+            club_id=review.club_id,
+            book_id=review.book_id,
+            user_id=review.user_id,
+            rating=review.rating,
+            comment=review.comment
+        )
+        db.add(db_review) 
+        db.commit()
+        db.refresh(db_review)
+        return db_review
+
+    except Exception as e:
+        return None
+
+
+def update_review(db: Session, review: schemas.ReviewUpdate):
+    try:
+        db_review = db.query(models.Review).filter(models.Review.id == review.id, models.Review.club_id == review.club_id, models.Review.book_id == review.book_id).first()
+        if not db_review:
+            return None
+
+        db_review.rating = review.rating
+        db_review.comment = review.comment
+        db.add(db_review) 
+        db.commit()
+        db.refresh(db_review)
+        return db_review
+
+    except Exception as e:
+        return None
+
+
+def delete_review(db: Session, review_id: int):
+    try:
+        db_review = db.query(models.Review).filter(models.Review.id == review_id).first()
+        if not db_review:
+            return None
+        db.delete(db_review)
+        db.commit()
+        return db_review
+
+    except Exception as e:
+        return None
+
+# =========REVIEWS ============
 
 # CREATE
 # ALL

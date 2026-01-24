@@ -101,3 +101,35 @@ def delete_book_votes(club_id: int, book_id: int, db: Session = Depends(get_db))
     return crud.delete_votes_by_book_id(db=db, book_id=book_id, club_id=club_id)    
     
 
+# REVIEWS
+@app.get("/clubs/{club_id}/books/{book_id}/reviews", response_model=list[schemas.ReviewOut], status_code=200)
+def get_reviews_by_book_id(club_id: int, book_id: int, db: Session = Depends(get_db)):
+    reviews = crud.get_reviews_by_book_id(db=db, book_id=book_id, club_id=club_id)
+    if not reviews:
+        raise HTTPException(status_code=404, detail="Reviews no encontrados")
+    return reviews
+
+
+@app.post("/clubs/{club_id}/books/{book_id}/reviews", response_model=schemas.ReviewOut, status_code=201)
+def create_review(review_in: schemas.ReviewCreate, db: Session = Depends(get_db)):
+    new_review = crud.create_review(db=db, review=review_in)
+    if not new_review:
+        raise HTTPException(status_code=404, detail="Review no creado")
+    return new_review
+
+
+@app.put("/clubs/{club_id}/books/{book_id}/reviews/{review_id}", response_model=schemas.ReviewOut, status_code=200)
+def update_review(review_id: int, review_in: schemas.ReviewUpdate, db: Session = Depends(get_db)):
+    updated_review = crud.update_review(db=db, review=review_in)
+    if not updated_review:
+        raise HTTPException(status_code=404, detail="Review no actualizado")
+    return updated_review
+
+
+@app.delete("/clubs/{club_id}/books/{book_id}/reviews/{review_id}", status_code=204)
+def delete_review(review_id: int, db: Session = Depends(get_db)):
+    deleted_review = crud.delete_review(db=db, review_id=review_id)
+    if not deleted_review:
+        raise HTTPException(status_code=404, detail="Review no eliminado")
+    return
+

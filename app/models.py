@@ -37,7 +37,9 @@ class Review(Base):
     __tablename__ = "reviews"
     id           = Column(Integer, primary_key=True, index=True, autoincrement=True)
     book_id      = Column(Integer, ForeignKey("libros.id"), nullable=False)
+    club_id      = Column(Integer, ForeignKey("clubes.id"), nullable=False)
     user_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
     rating       = Column(Integer, default=0)
     comment      = Column(String)
     created_date = Column(DateTime(timezone=True), server_default=func.now())
+
