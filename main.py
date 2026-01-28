@@ -170,6 +170,17 @@ def meetings(meeting : schemas.MeetingCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No se pudo crear")
     return
 
+# = = = = = DELETE
+@app.delete("/clubs/{club_id}/meetings/{meeting_id}", status_code=204)
+def cancel_meeting(club_id: int, meeting_id: int, db: Session = Depends(get_db)):
+
+    deleted_meeting = crud.delete_meeting(db=db, club_id=club_id, meeting_id=meeting_id)
+    
+    if not deleted_meeting:
+        raise HTTPException(status_code=404, 
+            detail="La reunión no existe o no pertenece a este club"
+        )
+    return #204 estado indica proceso exitoso pero no hay contenido de vuelta 
 
 # MEETINGS ATENDANCE
 @app.put("/clubs/{club_id}/meetings/{meeting_id}/attendance",response_model=schemas.MeetingAttendanceOut)
