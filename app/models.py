@@ -69,4 +69,7 @@ class Meeting(Base):
     virtualMeetingUrl = Column(String)
 
 
+class MeetingAttendance(Base):
+    meeting_id   = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    user_id   = Column(Integer, ForeignKey("users.id"), nullable=False)
 
