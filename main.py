@@ -183,12 +183,10 @@ def cancel_meeting(club_id: int, meeting_id: int, db: Session = Depends(get_db))
     return #204 estado indica proceso exitoso pero no hay contenido de vuelta 
 
 # MEETINGS ATENDANCE
-@app.put("/clubs/{club_id}/meetings/{meeting_id}/attendance",response_model=schemas.MeetingAttendanceOut)
+@app.post("/clubs/{club_id}/meetings/{meeting_id}/attendance", status_code=201)
 def confirm_attendance(club_id: int, meeting_id: int, attendance_in: schemas.MeetingAttendanceCreate, db: Session = Depends(get_db)):
-    return {
-        "userId": "usr_abc123",
-        "meetingId": f"mtg_{meeting_id}",
-        "status": attendance_in.status,
-        "note": attendance_in.note,
-    }
+    attendance = crud.create_attendance_meeting(db, meeting_id, attendance_in)    
+    if not attendance:
+        raise HTTPException(status_code=400, detail="No se pudo crear")
+    return 
 

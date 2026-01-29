@@ -2,6 +2,13 @@ from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from typing import Optional
 from pydantic.config import ConfigDict
+from enum import Enum
+
+class AttendanceValue(str, Enum):
+    SI      = 'SI'
+    NO      = 'NO'
+    TAL_VEZ = 'TAL_VEZ'
+
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -127,17 +134,14 @@ class MeetingOut(BaseModel):
 
 
 class MeetingAttendanceCreate(BaseModel):
-    status: str | None = None  # Asistiré | Tal Vez | Rechazo
-    note: str| str = None
-
+    user_id: int
+    status: AttendanceValue
 
 class MeetingAttendanceOut(BaseModel):
     id: str | str = None
-    status: str | None = None  # Asistiré | Tal Vez | Rechazo
-    note: str| str = None
+    user_id: int | int = None
+    status: str | None = None  
 
     
-
-
 class Config:
     from_attributes = True 

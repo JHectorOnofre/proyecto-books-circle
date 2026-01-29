@@ -220,12 +220,6 @@ def create_meeting(db: Session, meeting: schemas.MeetingCreate):
     except Exception as e:
         return None
     
-
-# =========MEETINGS ATTENDANCE============
-
-
-
-
 # = = = = = Implementación DELETE CLUBS = = = = = 
 def delete_meeting(db: Session, club_id: int, meeting_id: int):
     try:
@@ -243,7 +237,20 @@ def delete_meeting(db: Session, club_id: int, meeting_id: int):
     except Exception as e:
         return None # En caso no exista
 
+# =========MEETINGS ATTENDANCE============
 
+def create_attendance_meeting(db: Session, meeting_id, meeting: schemas.MeetingAttendanceCreate):
+    try:
+        db_attendance = models.MeetingAttendance(
+            meeting_id = meeting_id,
+            user_id = meeting.user_id,
+            status = meeting.status
+        )
 
+        db.add(db_attendance) 
+        db.commit()
+        db.refresh(db_attendance)
+        return db_attendance
 
-
+    except Exception as e:
+        return None
