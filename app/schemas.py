@@ -142,6 +142,10 @@ class MeetingAttendanceOut(BaseModel):
     user_id: int | int = None
     status: str | None = None  
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
     
 class Config:
     from_attributes = True 
