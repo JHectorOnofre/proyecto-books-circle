@@ -69,4 +69,10 @@ class Meeting(Base):
     virtualMeetingUrl = Column(String)
 
 
+class MeetingAttendance(Base):
+    __tablename__ = "meeting_attendance"
+    id         = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status     = Column(String, default='SI')
 

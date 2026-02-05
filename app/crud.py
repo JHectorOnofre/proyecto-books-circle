@@ -1,6 +1,8 @@
 # app/crud.py
 from sqlalchemy.orm import Session
 from . import models, schemas
+from app.core import security
+from datetime import datetime
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
@@ -11,10 +13,11 @@ def get_user_by_username(db: Session, username: str):
 
 
 def create_user(db: Session, user: schemas.UserCreate):
+    hashed_password = security.get_password_hash(user.password)
     db_user = models.User(
         email=user.email,
         username=user.username,
-        hashed_password=user.password,
+        hashed_password=hashed_password,
         full_name=user.fullName
     )
     db.add(db_user)
@@ -115,6 +118,23 @@ def delete_votes_by_book_id(db: Session, book_id: int, club_id: int):
     db.refresh(book)
     return book.votes
 
+#Funcioens faltantes Books 
+def get_book_progress(db: Session, book_id: int, club_id: int):
+    book = db.query(models.Book).filter(models.Book.id == book_id, models.Book.club_id == club_id).first()
+    if book:
+        return book.progress
+    return None
+
+def update_book_progress(db: Session, book_id: int, club_id: int, progress: int):
+    book = db.query(models.Book).filter(models.Book.id == book_id, models.Book.club_id == club_id).first()
+    if book:
+        book.progress = max(0, min(100, progress))
+        db.commit()
+        db.refresh(book)
+        return book
+    return None
+
+
 
 # =========REVIEWS ============
 def get_reviews_by_book_id(db: Session, book_id: int, club_id: int):
@@ -179,12 +199,18 @@ def get_meetings_by_id(db: Session, meeting_id: int):
 
 def create_meeting(db: Session, meeting: schemas.MeetingCreate):
     try:
+        scheduled_at = meeting.scheduledAt
+        if isinstance(scheduled_at, str):
+            try:
+                scheduled_at = datetime.fromisoformat(scheduled_at)
+            except ValueError:
+                pass
+
         db_meeting = models.Meeting(
-            id = meeting.id,
             book_id = meeting.bookId,
             club_id = meeting.clubId,
             book_title = meeting.bookTitle,
-            scheduled_at = meeting.scheduledAt,
+            scheduled_at = scheduled_at,
             duration = meeting.duration,
             location = meeting.location,
             locationUrl = meeting.locationUrl,
@@ -202,7 +228,7 @@ def create_meeting(db: Session, meeting: schemas.MeetingCreate):
 
     except Exception as e:
         return None
-
+    
 # = = = = = Implementación DELETE CLUBS = = = = = 
 def delete_meeting(db: Session, club_id: int, meeting_id: int):
     try:
@@ -220,7 +246,20 @@ def delete_meeting(db: Session, club_id: int, meeting_id: int):
     except Exception as e:
         return None # En caso no exista
 
+# =========MEETINGS ATTENDANCE============
 
+def create_attendance_meeting(db: Session, meeting_id, meeting: schemas.MeetingAttendanceCreate):
+    try:
+        db_attendance = models.MeetingAttendance(
+            meeting_id = meeting_id,
+            user_id = meeting.user_id,
+            status = meeting.status
+        )
 
+        db.add(db_attendance) 
+        db.commit()
+        db.refresh(db_attendance)
+        return db_attendance
 
-
+    except Exception as e:
+        return None

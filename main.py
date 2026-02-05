@@ -1,6 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app import models, schemas, database, crud
+from app.core import security
+from jose import JWTError, jwt
 
 app = FastAPI(title="BookCircle API")
 
@@ -12,6 +15,40 @@ def get_db():
         yield db
     finally:
         db.close()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = crud.get_user_by_username(db, username=username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+@app.post("/token", response_model=schemas.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = crud.get_user_by_username(db, username=form_data.username)
+    if not user or not security.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = security.create_access_token(
+        data={"sub": user.username}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/auth/register", response_model=schemas.UserOut, status_code=201)
 def register_user(
@@ -32,19 +69,19 @@ def register_user(
 
 # CLUBS
 @app.get("/clubs", response_model=list[schemas.ClubOut], status_code=200)
-def clubs(db: Session = Depends(get_db)):
+def clubs(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     clubs = crud.get_clubs(db=db)
     return clubs
 
 
 @app.post("/clubs", response_model=schemas.ClubOut, status_code=201)
-def create_club(club_in: schemas.ClubCreate, db: Session = Depends(get_db)):
+def create_club(club_in: schemas.ClubCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     new_club = crud.create_club(db=db, club=club_in)
     return new_club
 
 
 @app.put("/clubs/{club_id}", response_model=schemas.ClubOut, status_code=200)
-def update_club(club_id: int, club_in: schemas.ClubCreate, db: Session = Depends(get_db)):
+def update_club(club_id: int, club_in: schemas.ClubCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     new_club = crud.update_club(db=db, club=club_in, club_id=club_id)
     if not new_club:
         raise HTTPException(status_code=404, detail="Club no encontrado")
@@ -52,7 +89,7 @@ def update_club(club_id: int, club_in: schemas.ClubCreate, db: Session = Depends
 
 
 @app.get("/clubs/{club_id}", response_model=schemas.ClubOut, status_code=200)
-def get_club(club_id: int, db: Session = Depends(get_db)):
+def get_club(club_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     club = crud.get_club_by_id(db=db, club_id=club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Club no encontrado")
@@ -60,15 +97,16 @@ def get_club(club_id: int, db: Session = Depends(get_db)):
 
 
 @app.delete("/clubs/{club_id}", status_code=204)
-def delete_club(club_id: int, db: Session = Depends(get_db)):
+def delete_club(club_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     club = crud.delete_club(db=db, club_id=club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Club no encontrado")
     return
 
+### Endpoints: B o o k s ###
 
 @app.get("/clubs/{club_id}/books", response_model=list[schemas.BookOut], status_code=200)
-def get_books_by_club_id(club_id: int, db: Session = Depends(get_db)):
+def get_books_by_club_id(club_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     books = crud.get_books_by_club_id(db=db, club_id=club_id)
     if not books:
         raise HTTPException(status_code=404, detail="Libros no encontrados")
@@ -76,7 +114,7 @@ def get_books_by_club_id(club_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/clubs/{club_id}/books", response_model=schemas.BookOut, status_code=201)
-def create_book(club_id: int, book_in: schemas.BookCreate, db: Session = Depends(get_db)):
+def create_book(club_id: int, book_in: schemas.BookCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     new_book = crud.create_book(db=db, book=book_in)
     if not new_book:
         raise HTTPException(status_code=404, detail="Libro no creado")
@@ -84,7 +122,7 @@ def create_book(club_id: int, book_in: schemas.BookCreate, db: Session = Depends
 
 
 @app.get("/clubs/{club_id}/books/{book_id}", response_model=schemas.BookOut, status_code=200)
-def get_book_details(club_id: int, book_id: int, db: Session = Depends(get_db)):
+def get_book_details(club_id: int, book_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     book = crud.get_book_by_id(db=db, book_id=book_id, club_id=club_id)
     if not book:
         raise HTTPException(status_code=404, detail="Libro no encontrado")
@@ -92,18 +130,35 @@ def get_book_details(club_id: int, book_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/clubs/{club_id}/books/{book_id}/votes", status_code=200)
-def get_book_votes(club_id: int, book_id: int, db: Session = Depends(get_db)):
+def get_book_votes(club_id: int, book_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.add_votes_by_book_id(db=db, book_id=book_id, club_id=club_id)
 
 
 @app.delete("/clubs/{club_id}/books/{book_id}/votes", status_code=204)
-def delete_book_votes(club_id: int, book_id: int, db: Session = Depends(get_db)):
+def delete_book_votes(club_id: int, book_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.delete_votes_by_book_id(db=db, book_id=book_id, club_id=club_id)    
-    
+
+#FUnciones faltantes GET progres y PUT update_progress
+@app.get("/clubs/{clubId}/books/{bookId}/progress", status_code=200)
+def get_reading_progress(clubId: int, bookId: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    progress = crud.get_book_progress(db=db, book_id=bookId, club_id=clubId)
+    if progress is None:
+        raise HTTPException(status_code=404, detail="Libro o progreso no encontrado")
+    return {"progress": progress}
+
+@app.put("/clubs/{clubId}/books/{bookId}/progress", response_model=schemas.BookOut, status_code=200)
+def update_reading_progress(clubId: int, bookId: int, progress: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    updated_book = crud.update_book_progress(db=db, book_id=bookId, club_id=clubId, progress=progress)
+    if not updated_book:
+        raise HTTPException(status_code=404, detail="No se pudo actualizar el progreso: Libro no encontrado")
+    return updated_book
+
+
+
 
 # REVIEWS
 @app.get("/clubs/{club_id}/books/{book_id}/reviews", response_model=list[schemas.ReviewOut], status_code=200)
-def get_reviews_by_book_id(club_id: int, book_id: int, db: Session = Depends(get_db)):
+def get_reviews_by_book_id(club_id: int, book_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     reviews = crud.get_reviews_by_book_id(db=db, book_id=book_id, club_id=club_id)
     if not reviews:
         raise HTTPException(status_code=404, detail="Reviews no encontrados")
@@ -111,7 +166,7 @@ def get_reviews_by_book_id(club_id: int, book_id: int, db: Session = Depends(get
 
 
 @app.post("/clubs/{club_id}/books/{book_id}/reviews", response_model=schemas.ReviewOut, status_code=201)
-def create_review(review_in: schemas.ReviewCreate, db: Session = Depends(get_db)):
+def create_review(review_in: schemas.ReviewCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     new_review = crud.create_review(db=db, review=review_in)
     if not new_review:
         raise HTTPException(status_code=404, detail="Review no creado")
@@ -119,7 +174,7 @@ def create_review(review_in: schemas.ReviewCreate, db: Session = Depends(get_db)
 
 
 @app.put("/clubs/{club_id}/books/{book_id}/reviews/{review_id}", response_model=schemas.ReviewOut, status_code=200)
-def update_review(review_id: int, review_in: schemas.ReviewUpdate, db: Session = Depends(get_db)):
+def update_review(review_id: int, review_in: schemas.ReviewUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     updated_review = crud.update_review(db=db, review=review_in)
     if not updated_review:
         raise HTTPException(status_code=404, detail="Review no actualizado")
@@ -127,25 +182,26 @@ def update_review(review_id: int, review_in: schemas.ReviewUpdate, db: Session =
 
 
 @app.delete("/clubs/{club_id}/books/{book_id}/reviews/{review_id}", status_code=204)
-def delete_review(review_id: int, db: Session = Depends(get_db)):
+def delete_review(review_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     deleted_review = crud.delete_review(db=db, review_id=review_id)
     if not deleted_review:
         raise HTTPException(status_code=404, detail="Review no eliminado")
     return
 
 
+# MEETINGS
 @app.get("/clubs/{club_id}/meetings", status_code=200)
-def meetings(club_id: int, db: Session = Depends(get_db)):
+def meetings(club_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.get_meetings_by_club_id(db=db, club_id=club_id)
 
 
 @app.get("/clubs/{club_id}/meetings/{meeting_id}", status_code=200)
-def meetings(club_id: int, meeting_id:int, db: Session = Depends(get_db)):
+def meetings(club_id: int, meeting_id:int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.get_meetings_by_id(db=db, meeting_id=meeting_id)
 
 
 @app.post("/clubs/{club_id}/meetings", status_code=201)
-def meetings(meeting : schemas.MeetingCreate, db: Session = Depends(get_db)):
+def meetings(meeting : schemas.MeetingCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     meeting = crud.create_meeting(db=db, meeting=meeting)
     if not meeting:
         raise HTTPException(status_code=400, detail="No se pudo crear")
@@ -153,7 +209,7 @@ def meetings(meeting : schemas.MeetingCreate, db: Session = Depends(get_db)):
 
 # = = = = = DELETE
 @app.delete("/clubs/{club_id}/meetings/{meeting_id}", status_code=204)
-def cancel_meeting(club_id: int, meeting_id: int, db: Session = Depends(get_db)):
+def cancel_meeting(club_id: int, meeting_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
 
     deleted_meeting = crud.delete_meeting(db=db, club_id=club_id, meeting_id=meeting_id)
     
@@ -162,3 +218,11 @@ def cancel_meeting(club_id: int, meeting_id: int, db: Session = Depends(get_db))
             detail="La reunión no existe o no pertenece a este club"
         )
     return #204 estado indica proceso exitoso pero no hay contenido de vuelta 
+
+# MEETINGS ATENDANCE
+@app.post("/clubs/{club_id}/meetings/{meeting_id}/attendance", status_code=201)
+def confirm_attendance(club_id: int, meeting_id: int, attendance_in: schemas.MeetingAttendanceCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    attendance = crud.create_attendance_meeting(db, meeting_id, attendance_in)    
+    if not attendance:
+        raise HTTPException(status_code=400, detail="No se pudo crear")
+    return
