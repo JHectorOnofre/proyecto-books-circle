@@ -5,6 +5,32 @@ from . import models, schemas
 from app.core import security
 from datetime import datetime
 
+"""
+NOTAS DE REFACTORIZACIÓN ASÍNCRONA:
+----------------------------------
+
+* Mientras que Sync BLOQUEA la ejecución simultánea, es decir, mientras el intérprete está 
+ejecutando una petición NO PERMITE que continúen las demás hasta terminarla, es decir, 
+en un solo hilo
+
+-> Se usa cuando: Bajo tráfico o moderado (apps que no son de alto rendimiento)
+
+* El cambio fundamental es que ahora el código NO SE DETIENE a esperar a la base de datos; 
+simplemente "avisa" que volverá cuando la respuesta esté lista, permitiendo que el servidor 
+atienda otras peticiones mientras tanto.
+
+-> Se usa cuando: Se tiene mucho tráfico / alto volumen / usuarios concurrentes
+
+1. 'async def': Define la función como una corrutina. Permite que FastAPI maneje 
+   la concurrencia de forma eficiente.
+2. 'AsyncSession': Sustituye a 'Session'. Es el nuevo tipo de objeto para 
+   interactuar con la DB en modo no-bloqueante.
+3. 'await db.execute(...)': El comando 'await' es obligatorio. Le dice al 
+   programa: "Libera el procesador mientras esperas que la DB responda este SELECT".
+4. 'select(...)': Cambiamos el estilo antiguo (db.query) por el estilo 2.0 de 
+   SQLAlchemy, que es más explícito y compatible con asincronía.
+"""
+
 async def get_user_by_email(db: AsyncSession, email: str):
     result = await db.execute(select(models.User).filter(models.User.email == email))
     return result.scalars().first()
